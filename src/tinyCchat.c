@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/select.h>
-
+#include <sqlite3.h>
 
 
 void tc_handle_error(const char *msg_err)
@@ -18,6 +18,67 @@ void tc_handle_error(const char *msg_err)
   exit(EXIT_FAILURE);
 }
 
+
+sqlite3 *tc_database_connection(const char *database_name)
+{
+  sqlite3 *db;
+  int tc_res = sqlite3_open(database_name, &db);
+  if (tc_res != SQLITE_OK)
+  {
+    sqlite3_close(db);
+    tc_handle_error("database connection");
+  }
+
+  return db;
+}
+
+
+void tc_database_create_table(sqlite3 *db)
+{
+  const char *query  = 
+    "CREATE TABLE users ("
+     "id INTEGER PRIMARY KEY, "
+     "name TEXT, "
+     "mensagens TEXT[]"
+     ")";
+
+  int tc_res = sqlite3_exec(db, query, NULL, 0, NULL);
+  if (tc_res != SQLITE_OK)
+  {
+    sqlite3_close(db);
+    tc_handle_error("table creation");
+  }
+}
+
+
+void tc_database_send_msg(
+  sqlite3 *db,
+  const char *msg,
+  size_t size_msg,
+  const char *user,
+  size_t user_len
+) {
+  sqlite3_stmt *stmt;
+  const char *query = "INSERT INTO users (name, mensagens) VALUES (?, ?)";
+
+  int tc_res = sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
+  if (tc_res != SQLITE_OK) tc_handle_error("prepare statement");
+
+  tc_res = sqlite3_bind_text(stmt, 1, user, user_len, SQLITE_STATIC);
+  if (tc_res != SQLITE_OK) tc_handle_error("bind user parameter");
+
+  tc_res = sqlite3_bind_text(stmt, 2, msg, size_msg, SQLITE_STATIC);
+  if (tc_res != SQLITE_OK) tc_handle_error("bind message parameter");
+
+  tc_res = sqlite3_step(stmt);
+  if (tc_res != SQLITE_DONE) tc_handle_error("execute statement");
+
+  tc_res = sqlite3_reset(stmt);
+  if (tc_res != SQLITE_OK) tc_handle_error("reset statement");
+
+  tc_res = sqlite3_finalize(stmt);
+  if (tc_res != SQLITE_OK) tc_handle_error("finalize statement");
+}
 
 
 void tc_name_handler(char *name, size_t size)
@@ -251,6 +312,7 @@ void tc_handle_new_connections(
 
 
 void tc_handle_client_data(
+  sqlite3 *db,
   int *client_sockets,
   fd_set *read_fds,
   char usernames[][TC_MAX_NAME_LENGTH]
@@ -288,6 +350,11 @@ void tc_handle_client_data(
           {
             char formatted_message[TC_MAX_MSG_LENGTH + TC_MAX_NAME_LENGTH + 4];
             sprintf(formatted_message, "\n%s> %s", usernames[i], buffer);
+
+            size_t len_user = strlen(usernames[i]);
+            size_t len_buff = strlen(buffer);
+            tc_database_send_msg(db, buffer, len_buff, usernames[i], len_user);
+
             int res = send(dest_socket, formatted_message, strlen(formatted_message), 0);
             if (res < 0) tc_handle_error("message send");
           }
@@ -301,6 +368,9 @@ void tc_handle_client_data(
 
 void tc_server_run(void)
 {
+  sqlite3 *db = tc_database_connection("file.db");
+  tc_database_create_table(db);
+
   int fd_server;
   // struct sockaddr_in address;
   // int addrlen = sizeof(address);
@@ -328,7 +398,7 @@ void tc_server_run(void)
       tc_handle_new_connections(fd_server, client_sockets, usernames);
     }
 
-    tc_handle_client_data(client_sockets, &read_fds, usernames);
+    tc_handle_client_data(db, client_sockets, &read_fds, usernames);
   }
 
   tc_server_close("server closed", fd_server);
