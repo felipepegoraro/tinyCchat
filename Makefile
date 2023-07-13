@@ -14,4 +14,4 @@ client: $(C_SRC).c
 all: server client
 
 clean: 
-	rm server client
+	rm server client file.db

@@ -7,6 +7,7 @@
 
 // #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sqlite3.h>
 
 #define TC_IPV4            AF_INET
 #define TC_ANY_ADDR        INADDR_ANY
@@ -22,5 +23,7 @@
 
 void tc_server_run(void);
 void tc_client_connect(void);
+
+extern sqlite3 *db;
 
 #endif // !TINYCCHAT

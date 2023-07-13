@@ -6,9 +6,13 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <errno.h>
 #include <sys/select.h>
 #include <sqlite3.h>
+
+
+sqlite3 *db;
 
 
 void tc_handle_error(const char *msg_err)
@@ -17,6 +21,15 @@ void tc_handle_error(const char *msg_err)
   else fprintf(stderr, "TC ERROR: %s\n", msg_err);
   exit(EXIT_FAILURE);
 }
+
+
+void tc_interrupt_handler(int signum)
+{
+  fprintf(stdout, "\n[%d]: program terminated\n", signum);
+  sqlite3_close(db);
+  exit(EXIT_SUCCESS);
+}
+
 
 
 sqlite3 *tc_database_connection(const char *database_name)
@@ -94,7 +107,7 @@ void tc_name_handler(char *name, size_t size)
 
 void tc_read_username(char *username, size_t size)
 {
-  printf("Enter your name: ");
+  fprintf(stdout, "Enter your name: ");
   fgets(username, size, stdin);
   tc_name_handler(username, size);
   username[strcspn(username, "\n")] = '\0';
@@ -368,12 +381,13 @@ void tc_handle_client_data(
 
 void tc_server_run(void)
 {
-  sqlite3 *db = tc_database_connection("file.db");
+  db = tc_database_connection("file.db");
   tc_database_create_table(db);
 
+  signal(SIGQUIT, tc_interrupt_handler);
+  signal(SIGINT, tc_interrupt_handler);
+
   int fd_server;
-  // struct sockaddr_in address;
-  // int addrlen = sizeof(address);
 
   fd_set read_fds;
   int client_sockets[TC_LISTEN_DEFAULT];
@@ -402,4 +416,5 @@ void tc_server_run(void)
   }
 
   tc_server_close("server closed", fd_server);
+  sqlite3_close(db);
 }
