@@ -49,7 +49,7 @@ sqlite3 *tc_database_connection(const char *database_name)
 void tc_database_create_table(sqlite3 *db)
 {
   const char *query  = 
-    "CREATE TABLE users ("
+    "CREATE TABLE IF NOT EXISTS users ("
      "id INTEGER PRIMARY KEY, "
      "name TEXT, "
      "mensagens TEXT[]"
@@ -329,44 +329,35 @@ void tc_handle_client_data(
   int *client_sockets,
   fd_set *read_fds,
   char usernames[][TC_MAX_NAME_LENGTH]
-){
-  for (int i = 0; i < TC_LISTEN_DEFAULT; i++)
-  {
+) {
+  for (int i = 0; i < TC_LISTEN_DEFAULT; i++) {
     int client_socket = client_sockets[i];
 
-    if (FD_ISSET(client_socket, read_fds))
-    {
+    if (FD_ISSET(client_socket, read_fds)) {
       char buffer[TC_MAX_MSG_LENGTH];
       int recv_size = recv(client_socket, buffer, sizeof(buffer), 0);
 
-      if (recv_size < 0)
-      {
+      if (recv_size < 0) {
         tc_handle_error("when receiving the message from the client");
-      }
-      else if (recv_size == 0)
-      {
+      } else if (recv_size == 0) {
         printf("client disconnected: %s\n", usernames[i]);
         close(client_socket);
         client_sockets[i] = 0;
         usernames[i][0] = '\0';
-      }
-      else
-      {
+      } else {
         buffer[recv_size] = '\0';
         printf("[%s]: %s\n", usernames[i], buffer);
 
-        for (int j = 0; j < TC_LISTEN_DEFAULT;j++)
-        {
+        size_t len_user = strlen(usernames[i]);
+        size_t len_buff = strlen(buffer);
+        tc_database_send_msg(db, buffer, len_buff, usernames[i], len_user);
+
+        for (int j = 0; j < TC_LISTEN_DEFAULT; j++) {
           int dest_socket = client_sockets[j];
 
-          if (dest_socket != client_socket && dest_socket > 0)
-          {
+          if (dest_socket != client_socket && dest_socket > 0) {
             char formatted_message[TC_MAX_MSG_LENGTH + TC_MAX_NAME_LENGTH + 4];
             sprintf(formatted_message, "\n%s> %s", usernames[i], buffer);
-
-            size_t len_user = strlen(usernames[i]);
-            size_t len_buff = strlen(buffer);
-            tc_database_send_msg(db, buffer, len_buff, usernames[i], len_user);
 
             int res = send(dest_socket, formatted_message, strlen(formatted_message), 0);
             if (res < 0) tc_handle_error("message send");
