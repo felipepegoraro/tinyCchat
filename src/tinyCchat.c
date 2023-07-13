@@ -52,7 +52,7 @@ void tc_database_create_table(sqlite3 *db)
     "CREATE TABLE IF NOT EXISTS users ("
      "id INTEGER PRIMARY KEY, "
      "name TEXT, "
-     "mensagens TEXT[]"
+     "mensagens TEXT"
      ")";
 
   int tc_res = sqlite3_exec(db, query, NULL, 0, NULL);
