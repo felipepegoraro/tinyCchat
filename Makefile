@@ -14,4 +14,7 @@ client: $(C_SRC).c
 all: server client
 
 clean: 
-	rm server client file.db
+	rm server client
+
+clean_db:
+	find . -name '*.db' -exec rm -i {} \;

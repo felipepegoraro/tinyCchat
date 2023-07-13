@@ -21,7 +21,7 @@
 #define TC_TEXT_BOLD       "\033[1m"
 #define TC_TEXT_C_PROMPT   "\033[1;94m"
 
-void tc_server_run(void);
+void tc_server_run(const char *db_filename);
 void tc_client_connect(void);
 
 extern sqlite3 *db;

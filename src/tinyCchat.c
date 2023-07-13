@@ -370,9 +370,9 @@ void tc_handle_client_data(
 
 
 
-void tc_server_run(void)
+void tc_server_run(const char *db_filename)
 {
-  db = tc_database_connection("file.db");
+  db = tc_database_connection(db_filename);
   tc_database_create_table(db);
 
   signal(SIGQUIT, tc_interrupt_handler);
